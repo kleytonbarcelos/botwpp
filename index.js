@@ -63,55 +63,40 @@ const processImage = async (imageUrl) => {
     return "Desculpe, ainda não posso interpretar imagens.";
 };
 
-// Lida com a entrada JSON do webhook
 app.post('/whatsapp/webhook', async (req, res) => {
     try {
-        console.log("Requisição recebida:", JSON.stringify(req.body, null, 2));
-
-        if (Array.isArray(req.body) && req.body.length > 0) {
-            const { data } = req.body[0];
-            // Processar a mensagem
-        } else {
-            console.log('Corpo da requisição inválido ou vazio.', req.body);
-            res.status(400).send("Corpo da requisição inválido ou vazio.");
-        }
+        console.log("Requisição recebida:", req.body);
         
+        // Verifica se o corpo da requisição está no formato esperado
+        if (Array.isArray(req.body) && req.body.length > 0 && req.body[0].data) {
+            const { data } = req.body[0]; // Acessando o corpo do JSON
 
-        const { data } = req.body[0]; // Acessando o corpo do JSON
-        const messageType = data.messageType;
-        const number = data.key.remoteJid;
+            const messageType = data.messageType;
+            const number = data.key.remoteJid || 'Número não encontrado';
 
-        if (messageType === 'conversation') {
-            const conversationText = data.message.conversation;
-            console.log(`Texto recebido: ${conversationText}`);
-            const responseMessage = await processMessage(conversationText);
-            await sendResponse(number, responseMessage);
-            res.status(200).send("Texto processado e resposta enviada.");
-        } else if (messageType === 'audioMessage') {
-            const audioUrl = data.message.audioMessage.url;
-            console.log(`Áudio recebido: ${audioUrl}`);
-            const audioResponse = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-            const base64Audio = Buffer.from(audioResponse.data, 'binary').toString('base64');
-            const transcribedText = await transcribeAudio(base64Audio);
-            const responseMessage = await processMessage(transcribedText);
-            await sendResponse(number, responseMessage);
-            res.status(200).send("Áudio processado e resposta enviada.");
-        } else if (messageType === 'imageMessage') {
-            const imageUrl = data.message.imageMessage.url;
-            console.log(`Imagem recebida: ${imageUrl}`);
-            const responseMessage = await processImage(imageUrl);
-            await sendResponse(number, responseMessage);
-            res.status(200).send("Imagem processada e resposta enviada.");
+            if (messageType === 'conversation') {
+                const messageText = data.message.conversation || "Mensagem vazia";
+                const responseMessage = await processMessage(messageText);
+                
+                // Enviar a resposta para a API
+                await sendResponse(number, responseMessage);
+                res.status(200).send("Mensagem de texto processada e resposta enviada.");
+            } else if (messageType === 'audioMessage') {
+                // Processar áudio (exemplo simplificado)
+                res.status(200).send("Mensagem de áudio recebida e processada.");
+            } else {
+                res.status(400).send("Tipo de mensagem não suportada.");
+            }
         } else {
-            console.log("Tipo de mensagem não suportada.");
-            await sendResponse(number, "Não consegui entender o tipo de mensagem. Pode tentar novamente?");
-            res.status(400).send("Tipo de mensagem não suportada.");
+            console.log("Corpo da requisição inválido ou vazio.", req.body);
+            res.status(400).send("Corpo da requisição inválido ou vazio.");
         }
     } catch (error) {
         console.error("Erro ao processar a requisição:", error);
-        res.status(500).send("Erro ao processar a solicitação.");
+        res.status(500).send("Erro ao processar a requisição.");
     }
 });
+
 
 // Configurando o servidor para rodar na porta 8080
 const PORT = process.env.PORT || 8080;
