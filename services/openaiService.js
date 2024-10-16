@@ -7,7 +7,7 @@ exports.processMessage = async (message) => {
         max_tokens: 100
     }, {
         headers: {
-            'Authorization': `Bearer YOUR_OPENAI_API_KEY`
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
     });
     return response.data.choices[0].text.trim();
 };
@@ -19,7 +19,7 @@ exports.transcribeAudio = async (base64Audio) => {
         model: "whisper-1"
     }, {
         headers: {
-            'Authorization': `Bearer YOUR_OPENAI_API_KEY`
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
     });
     return response.data.text;
 };
