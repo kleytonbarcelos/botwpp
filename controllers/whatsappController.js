@@ -1,31 +1,35 @@
 const axios = require('axios');
 const { transcribeAudio, processMessage } = require('../services/openaiService');
 
-// Lida com as mensagens recebidas no webhook
+// Lida com a entrada JSON do webhook
 exports.handleWebhook = async (req, res) => {
-    const { messageType, conversation, number } = req.body;
+    try {
+        const { data } = req.body[0]; // Acessando o corpo do JSON
+        const messageType = data.messageType;
+        const audioUrl = data.message.audioMessage.url;
+        const number = data.key.remoteJid;
 
-    if (messageType === 'conversation') {
-        const response = await processMessage(conversation);
-        sendResponse(number, response);
-        res.status(200).send("Mensagem processada.");
-    } else if (messageType === 'audioMessage') {
-        res.redirect('/whatsapp/audio');
-    } else {
-        res.status(400).send("Tipo de mensagem não suportada.");
+        if (messageType === 'audioMessage') {
+            // Baixar o áudio e processar a transcrição
+            const audioResponse = await axios.get(audioUrl, { responseType: 'arraybuffer' });
+            const base64Audio = Buffer.from(audioResponse.data, 'binary').toString('base64');
+            
+            const transcribedText = await transcribeAudio(base64Audio);
+            const responseMessage = await processMessage(transcribedText);
+            
+            // Enviar a resposta para a API
+            await sendResponse(number, responseMessage);
+            res.status(200).send("Áudio processado e resposta enviada.");
+        } else {
+            res.status(400).send("Tipo de mensagem não suportada.");
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("Erro ao processar a solicitação.");
     }
 };
 
-// Lida com as mensagens de áudio
-exports.handleAudioMessage = async (req, res) => {
-    const base64Audio = req.body.base64; // Recebe o áudio em base64
-    const transcribedText = await transcribeAudio(base64Audio);
-    const response = await processMessage(transcribedText);
-    sendResponse(req.body.number, response);
-    res.status(200).send("Áudio processado.");
-};
-
-// Função para enviar resposta via API externa
+// Função para enviar a resposta para o número
 const sendResponse = async (number, message) => {
     await axios.post('https://evolution.alfredy.site/message/sendText/ns', {
         number,
