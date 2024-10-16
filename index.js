@@ -4,8 +4,8 @@ const bodyParser = require('body-parser');
 const app = express();
 
 // Middleware
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 
 // Função para enviar a resposta para o número via API
 const sendResponse = async (number, message) => {
@@ -65,16 +65,17 @@ app.post('/whatsapp/webhook', async (req, res) => {
         console.log('Dados extraídos do corpo da requisição:', data);
 
         const messageType = data.messageType;
-        const audioUrl = data.message.audioMessage.url;
         const number = data.key.remoteJid;
 
-        console.log(`Tipo de mensagem: ${messageType}, URL do áudio: ${audioUrl}, Número: ${number}`);
+        console.log(`Tipo de mensagem: ${messageType}, Número: ${number}`);
 
+        // Lida com diferentes tipos de mensagens
         if (messageType === 'audioMessage') {
+            const audioUrl = data.message.audioMessage.url;
+            console.log(`URL do áudio: ${audioUrl}`);
+
             // Baixar o áudio e processar a transcrição
             const audioResponse = await axios.get(audioUrl, { responseType: 'arraybuffer' });
-            console.log('Áudio baixado com sucesso.');
-
             const base64Audio = Buffer.from(audioResponse.data, 'binary').toString('base64');
             console.log('Áudio convertido para base64.');
 
@@ -84,8 +85,29 @@ app.post('/whatsapp/webhook', async (req, res) => {
             // Enviar a resposta para a API
             await sendResponse(number, responseMessage);
             res.status(200).send("Áudio processado e resposta enviada.");
+
+        } else if (messageType === 'conversation') {
+            const text = data.message.conversation || data.message.text;
+            console.log(`Mensagem de texto recebida: ${text}`);
+
+            // Processar a mensagem de texto
+            const responseMessage = await processMessage(text);
+
+            // Enviar a resposta para a API
+            await sendResponse(number, responseMessage);
+            res.status(200).send("Texto processado e resposta enviada.");
+
+        } else if (messageType === 'imageMessage') {
+            const imageUrl = data.message.imageMessage.url;
+            console.log(`URL da imagem recebida: ${imageUrl}`);
+
+            // Aqui você poderia baixar e processar a imagem
+            await sendResponse(number, "Imagem recebida e processada.");
+            res.status(200).send("Imagem processada e resposta enviada.");
+
         } else {
-            console.log('Tipo de mensagem não suportada:', messageType);
+            console.log(`Tipo de mensagem não suportada: ${messageType}`);
+            await sendResponse(number, "Desculpe, não consegui entender sua mensagem. Poderia tentar novamente?");
             res.status(400).send("Tipo de mensagem não suportada.");
         }
     } catch (error) {
@@ -94,8 +116,8 @@ app.post('/whatsapp/webhook', async (req, res) => {
     }
 });
 
-// Configurando o servidor para rodar na porta 3000 ou a porta definida no ambiente
-const PORT = process.env.PORT || 3000;
+// Configurando o servidor para rodar na porta 8080 ou a porta definida no ambiente
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
