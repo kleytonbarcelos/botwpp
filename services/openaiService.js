@@ -8,6 +8,7 @@ exports.processMessage = async (message) => {
     }, {
         headers: {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        } // Fechando corretamente o bloco de headers
     });
     return response.data.choices[0].text.trim();
 };
@@ -20,6 +21,7 @@ exports.transcribeAudio = async (base64Audio) => {
     }, {
         headers: {
             'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        } // Fechando corretamente o bloco de headers
     });
     return response.data.text;
 };
