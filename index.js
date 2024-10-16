@@ -1,15 +1,16 @@
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
-const { Configuration, OpenAIApi } = require('openai');  // Importação correta da biblioteca OpenAI
+const OpenAI = require('openai');  // Importação da biblioteca OpenAI
+require('dotenv').config();
+
 
 const app = express();
 
 // Configuração do cliente OpenAI
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY  // Certifique-se de ter configurado sua chave API
 });
-const openai = new OpenAIApi(configuration);
 
 // Middleware
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -32,12 +33,12 @@ const sendResponse = async (number, message) => {
 // Processa o texto usando o OpenAI
 const processText = async (message) => {
     console.log(`Processando mensagem no OpenAI: ${message}`);
-    const response = await openai.createChatCompletion({
+    const response = await openai.chat.completions.create({
         model: "gpt-4",
         messages: [{ role: "user", content: message }],
         max_tokens: 100
     });
-    const result = response.data.choices[0].message.content.trim();
+    const result = response.choices[0].message.content.trim();
     console.log(`Resposta do OpenAI: ${result}`);
     return result;
 };
@@ -45,23 +46,23 @@ const processText = async (message) => {
 // Transcreve o áudio com Whisper API (OpenAI)
 const transcribeAudio = async (base64Audio) => {
     console.log('Transcrevendo áudio com Whisper API');
-    const response = await openai.createTranscription({
+    const response = await openai.audio.transcriptions.create({
         file: base64Audio,
         model: "whisper-1"
     });
-    console.log('Áudio transcrito com sucesso:', response.data.text);
-    return response.data.text;
+    console.log('Áudio transcrito com sucesso:', response.text);
+    return response.text;
 };
 
 // Gera uma descrição de imagem com OpenAI
 const describeImage = async (base64Image) => {
     console.log('Gerando descrição para a imagem com OpenAI');
-    const response = await openai.createImage({
+    const response = await openai.images.create({
         prompt: "Describe the content of the image",
         images: [{ data: base64Image }],
         max_tokens: 100
     });
-    const description = response.data.choices[0].message.content.trim();
+    const description = response.choices[0].message.content.trim();
     console.log('Descrição da imagem gerada:', description);
     return description;
 };
