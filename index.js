@@ -61,7 +61,6 @@ const transcribeAudio = async (base64Audio) => {
 // Processa a imagem (não diretamente suportado, precisaria de uma integração como OCR ou API de reconhecimento de imagem)
 const processImage = async (imageUrl) => {
     console.log("Processando imagem...");
-    // Aqui você pode integrar uma API para interpretar a imagem
     return "Desculpe, ainda não posso interpretar imagens.";
 };
 
@@ -69,6 +68,13 @@ const processImage = async (imageUrl) => {
 app.post('/whatsapp/webhook', async (req, res) => {
     try {
         console.log("Requisição recebida:", JSON.stringify(req.body, null, 2));
+
+        // Verifica se o corpo da requisição contém os dados esperados
+        if (!req.body || !Array.isArray(req.body) || req.body.length === 0 || !req.body[0].data) {
+            console.error("Corpo da requisição inválido ou vazio.");
+            return res.status(400).send("Corpo da requisição inválido ou vazio.");
+        }
+
         const { data } = req.body[0]; // Acessando o corpo do JSON
         const messageType = data.messageType;
         const number = data.key.remoteJid;
