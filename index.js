@@ -1,7 +1,14 @@
 const express = require('express');
 const axios = require('axios');
 const bodyParser = require('body-parser');
+const fs = require('fs');
 const app = express();
+const OpenAI = require('openai');
+
+// Inicialize o cliente OpenAI
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+});
 
 // Middleware
 app.use(bodyParser.json({ limit: '50mb' }));
@@ -22,34 +29,40 @@ const sendResponse = async (number, message) => {
 };
 
 // Processa o texto usando o OpenAI
-const processMessage = async (message) => {
+const processText = async (message) => {
     console.log(`Processando mensagem no OpenAI: ${message}`);
-    const response = await axios.post('https://api.openai.com/v1/engines/davinci/completions', {
-        prompt: message,
+    const response = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [{ role: "user", content: message }],
         max_tokens: 100
-    }, {
-        headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        }
     });
-    const result = response.data.choices[0].text.trim();
+    const result = response.choices[0].message.content.trim();
     console.log(`Resposta do OpenAI: ${result}`);
     return result;
 };
 
-// Transcreve o áudio com OpenAI
+// Transcreve o áudio com Whisper API (OpenAI)
 const transcribeAudio = async (base64Audio) => {
-    console.log('Transcrevendo áudio com OpenAI');
-    const response = await axios.post('https://api.openai.com/v1/audio/transcriptions', {
+    console.log('Transcrevendo áudio com Whisper API');
+    const response = await openai.audio.transcriptions.create({
         file: base64Audio,
         model: "whisper-1"
-    }, {
-        headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        }
     });
-    console.log('Áudio transcrito com sucesso:', response.data.text);
-    return response.data.text;
+    console.log('Áudio transcrito com sucesso:', response.text);
+    return response.text;
+};
+
+// Gera uma descrição de imagem com OpenAI
+const describeImage = async (base64Image) => {
+    console.log('Gerando descrição para a imagem com OpenAI');
+    const response = await openai.images.generate({
+        prompt: "Describe the content of the image",
+        images: [{ data: base64Image }],
+        max_tokens: 100
+    });
+    const description = response.choices[0].message.content.trim();
+    console.log('Descrição da imagem gerada:', description);
+    return description;
 };
 
 // Lida com a entrada JSON do webhook
@@ -80,7 +93,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
             console.log('Áudio convertido para base64.');
 
             const transcribedText = await transcribeAudio(base64Audio);
-            const responseMessage = await processMessage(transcribedText);
+            const responseMessage = await processText(transcribedText);
 
             // Enviar a resposta para a API
             await sendResponse(number, responseMessage);
@@ -91,7 +104,7 @@ app.post('/whatsapp/webhook', async (req, res) => {
             console.log(`Mensagem de texto recebida: ${text}`);
 
             // Processar a mensagem de texto
-            const responseMessage = await processMessage(text);
+            const responseMessage = await processText(text);
 
             // Enviar a resposta para a API
             await sendResponse(number, responseMessage);
@@ -101,9 +114,17 @@ app.post('/whatsapp/webhook', async (req, res) => {
             const imageUrl = data.message.imageMessage.url;
             console.log(`URL da imagem recebida: ${imageUrl}`);
 
-            // Aqui você poderia baixar e processar a imagem
-            await sendResponse(number, "Imagem recebida e processada.");
-            res.status(200).send("Imagem processada e resposta enviada.");
+            // Baixar a imagem e convertê-la para base64
+            const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+            const base64Image = Buffer.from(imageResponse.data, 'binary').toString('base64');
+            console.log('Imagem convertida para base64.');
+
+            // Gerar descrição da imagem com OpenAI
+            const description = await describeImage(base64Image);
+
+            // Enviar a descrição da imagem como resposta
+            await sendResponse(number, description);
+            res.status(200).send("Imagem processada e descrição enviada.");
 
         } else {
             console.log(`Tipo de mensagem não suportada: ${messageType}`);
