@@ -6,9 +6,8 @@ require('dotenv').config();
 
 const openai = require('openai');
 
-// Middleware
-app.use(bodyParser.json({ limit: '50mb' })); // Aumenta o limite para aceitar payloads maiores
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
 // Função para enviar a resposta via API
 const sendResponse = async (number, message) => {
@@ -69,11 +68,14 @@ app.post('/whatsapp/webhook', async (req, res) => {
     try {
         console.log("Requisição recebida:", JSON.stringify(req.body, null, 2));
 
-        // Verifica se o corpo da requisição contém os dados esperados
-        if (!req.body || !Array.isArray(req.body) || req.body.length === 0 || !req.body[0].data) {
-            console.error("Corpo da requisição inválido ou vazio.");
-            return res.status(400).send("Corpo da requisição inválido ou vazio.");
+        if (Array.isArray(req.body) && req.body.length > 0) {
+            const { data } = req.body[0];
+            // Processar a mensagem
+        } else {
+            console.log('Corpo da requisição inválido ou vazio.', req.body);
+            res.status(400).send("Corpo da requisição inválido ou vazio.");
         }
+        
 
         const { data } = req.body[0]; // Acessando o corpo do JSON
         const messageType = data.messageType;
